@@ -1,46 +1,75 @@
 import React, { Component } from 'react';
-import axios from 'axios';
+import styles from './App.module.css';
+import * as fetch from './services/images-api';
 import SearchBar from './SearchBar/SearchBar';
+import Loader from './Loader/Loader';
 import ImageGallery from './ImageGallery/ImageGallery';
 import Button from './Button/Button';
-import Modal from './Modal/Modal';
-import Loader from './Loader/Loader';
-
-const KEY = '14152955-bce4734e6e8c1e6bb8603a6e8';
-const URL = `https://pixabay.com/api/?q=ocean&page=1&key=${KEY}&image_type=photo&orientation=horizontal&per_page=12`;
 
 export default class App extends Component {
   state = {
-    images: [],
-    pageNumber: '',
-    query: '',
+    items: [],
+    searchQuery: '',
+    pageNumber: 1,
     isLoading: false,
   };
 
-  componentDidMount() {
-    this.setState({ isLoading: true });
-    axios
-      .get(URL)
-      .then(({ data }) => {
-        this.setState({ images: data.hits });
-      })
-      .catch(console.log)
-      .finally(() => this.setState({ isLoading: false }));
+  componentDidUpdate(prevProps, prevState) {
+    const { searchQuery, pageNumber } = this.state;
+    if (prevState.searchQuery !== searchQuery || prevState.pageNumber !== pageNumber) {
+      this.onSearch(searchQuery, pageNumber);
+    }
   }
 
-  handleSubmit = text => {
-    this.setState({ images: [], pageNumber: 1, query: text });
+  SubmitSearchBar = text => {
+    this.setState({
+      searchQuery: text,
+      items: [],
+      pageNumber: 1,
+    });
+  };
+
+  onSearch = (searchQuery, pageNumber) => {
+    const { scrollHeight } = document.documentElement;
+
+    this.setState({
+      isLoading: true,
+    });
+
+    fetch
+      .fetchImages(searchQuery, pageNumber)
+      .then(res =>
+        this.setState(state => ({
+          items: [...state.items, ...res.data.hits],
+        })),
+      )
+      .catch(error => console.log(error))
+      .finally(() => {
+        window.scrollTo({
+          top: scrollHeight,
+          behavior: 'smooth',
+        });
+
+        this.setState({
+          isLoading: false,
+        });
+      });
+  };
+
+  onLoadMore = () => {
+    this.setState(state => ({
+      pageNumber: state.pageNumber + 1,
+    }));
   };
 
   render() {
-    const { images, isLoading } = this.state;
+    const { items, isLoading } = this.state;
     return (
-      <div>
-        <SearchBar onHandleSubmit={this.handleSubmit} />
+      <div className={styles.App}>
+        <SearchBar onSubmit={this.SubmitSearchBar} />
+        <ImageGallery pictures={items} />
         {isLoading && <Loader />}
-        {images.length > 0 && <ImageGallery items={images} />}
-        <Modal />
-        <Button />
+        {items.length > 0 && <Button onLoadMore={this.onLoadMore} />}
       </div>
     );
   }
